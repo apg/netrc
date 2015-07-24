@@ -31,19 +31,24 @@
      [(null? tokens) entries]
      [else (match tokens
              [(list-rest "machine" name rest) (loop rest entries name login password)]
+             ;; default is really just a special case of `machine`. Technically it has to
+             ;; come last, but shh... for now it's fine.
+             [(list-rest "default" rest) (loop rest entries "default" login password)]
              [(list-rest "login" name rest) #:when (not (equal? machine ""))
               (loop rest entries machine name password)]
              [(list-rest "password" password rest) #:when (not (equal? machine ""))
               (loop rest entries machine login password)]
              [else entries])])))
 
-(define (netrc-find-entry machine)
-  (let loop ((entries (parse (tokenize (read-netrc)))))
+(define (netrc-find-entry machine #:use-default [use-default #f])
+  (let loop ((entries (parse (tokenize (read-netrc))))
+             (default #f))
     (cond
-     [(null? entries) #f]
+     [(null? entries) (and use-default default)]
      [(equal? (netrc-entry-machine (car entries)) machine) (car entries)]
-     [else (loop (cdr entries))])))
-
+     ;; if we discover the default, loop, but save it off for failure case.
+     [(equal? (netrc-entry-machine (car entries)) "default") (loop (cdr entries) (car entries))]
+     [else (loop (cdr entries) default)])))
 
 ;; would like to move this elsewhere, really.
 (module+ test
